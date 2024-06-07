@@ -1,0 +1,15 @@
+venv
+test_not
+.idea
+frames/
+
+myenv/
+menv
+
+__pycache__/
+
+test*.txt
+*.mp4
+
+res/
+res2/
