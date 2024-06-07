@@ -1,4 +1,4 @@
-### Penjelasan tentang Step "Analyze Unicode Characters"
+# Penjelasan tentang Step "Analyze Unicode Characters"
 
 #### 0. **Analisis Karakter Unicode**
 
@@ -43,11 +43,11 @@ Tabel berikut menunjukkan detail dari setiap karakter dalam teks "Hello, world! 
 - **Byte Mode (BM)**: Semua karakter bisa di-encode dalam mode ini.
 - **Kanji Mode (KM)**: Tidak ada karakter yang bisa di-encode dalam mode ini.
 
-### Mode yang Dipilih
+# Mode yang Dipilih
 
 **Byte Mode** dipilih karena semua karakter dalam teks input bisa di-encode dalam mode ini.
 
-### Implementasi dalam Kode
+# Implementasi dalam Kode
 
 Bagian kode yang melakukan analisis karakter Unicode dan memilih mode encoding adalah sebagai berikut:
 
@@ -84,7 +84,7 @@ class QrSegment:
         return len(self.bitData)
 ```
 
-### Contoh Penggunaan Kode
+# Contoh Penggunaan Kode
 
 ```python
 text = "Hello, world! 123"
@@ -97,7 +97,7 @@ for segment in segments:
 
 Output akan menunjukkan bahwa mode Byte dipilih, dengan jumlah byte dan panjang data dalam bit, sesuai dengan hasil analisis.
 
-### Penjelasan tentang Step "Membuat Data Segmen"
+# Penjelasan tentang Step "Membuat Data Segmen"
 
 #### 1. Konversi Karakter ke Bit
 
@@ -148,7 +148,7 @@ Segmen yang dihasilkan dari konversi di atas adalah sebagai berikut:
 4. Kompatibilitas:
    - Semua data digital pada dasarnya adalah biner. Menggunakan representasi biner memungkinkan berbagai jenis data (teks, URL, gambar kecil, dll.) untuk di-encode dalam QR Code dengan cara yang seragam dan dapat diandalkan.
 
-### Implementasi dalam Kode
+# Implementasi dalam Kode
 
 Dalam kode `QrCode`, pembuatan segmen data bisa dilakukan dengan menggunakan kelas `QrSegment`:
 
@@ -180,7 +180,7 @@ class QrSegment:
         return len(self.bitData)
 ```
 
-### Contoh Penggunaan Kode
+# Contoh Penggunaan Kode
 
 ```python
 text = "Hello, world! 123"
@@ -193,7 +193,7 @@ for segment in segments:
 
 Ini akan menghasilkan output yang serupa dengan deskripsi di atas, menunjukkan mode byte, jumlah byte, dan panjang data dalam bit.
 
-### Penjelasan tentang Step "Fit to Version Number"
+# Penjelasan tentang Step "Fit to Version Number"
 
 #### 2. **Menyesuaikan dengan Nomor Versi**
 
@@ -262,7 +262,7 @@ Catatan: **Satu codeword** didefinisikan sebagai 8 bit, yang juga dikenal sebaga
 
 **Versi 1** dipilih karena total panjang bit (148 bit) cukup muat dalam kapasitas data codewords versi ini (19 codewords untuk ECC level L).
 
-### Implementasi dalam Kode
+# Implementasi dalam Kode
 
 Bagian kode yang menyesuaikan dengan nomor versi ini dilakukan di beberapa fungsi, terutama yang terkait dengan menentukan panjang bit dan memilih versi yang sesuai.
 
@@ -307,7 +307,7 @@ chosen_version = fit_to_version(segments, 'L')
 print(f"Chosen version number: {chosen_version}")
 ```
 
-### Penjelasan Implementasi
+# Penjelasan Implementasi
 
 - **`QrSegment.get_total_bits_needed`**: Fungsi ini menghitung panjang bit yang dibutuhkan oleh segmen. Panjang bit dihitung berdasarkan jumlah bit dalam data segmen.
 - **`fit_to_version`**: Fungsi ini menentukan versi QR Code yang cocok berdasarkan panjang bit total dari semua segmen dan kapasitas versi QR Code. Fungsi ini mengiterasi melalui setiap versi (dari 1 hingga 40) dan memeriksa apakah total bit bisa muat dalam kapasitas codewords dari versi tersebut untuk level ECC yang diberikan.
@@ -315,7 +315,7 @@ print(f"Chosen version number: {chosen_version}")
 
 Dengan demikian, proses ini memastikan bahwa versi QR Code yang dipilih memiliki kapasitas yang cukup untuk menampung data yang di-encode.
 
-### Penjelasan tentang Step "Concatenate Segments, Add Padding, Make Codewords"
+# Penjelasan tentang Step "Concatenate Segments, Add Padding, Make Codewords"
 
 #### 3. **Menggabungkan Segmen, Menambah Padding, dan Membuat Codewords**
 
@@ -372,7 +372,7 @@ Langkah ini melibatkan penggabungan berbagai string bit, penambahan padding, dan
 41 14 86 56 C6 C6 F2 C2 07 76 F7 26 C6 42 12 03 13 23 30
 ```
 
-### Implementasi dalam Kode
+# Implementasi dalam Kode
 
 Bagian kode yang menggabungkan segmen, menambah padding, dan membuat codewords ini dapat dilakukan dalam fungsi atau metode yang mengatur bit string akhir dari data yang akan di-encode ke dalam QR Code.
 
@@ -423,7 +423,7 @@ codewords_hex = [f"{int(padded_data[i:i+8], 2):02X}" for i in range(0, len(padde
 print(f"Total data codeword bytes (in hexadecimal): {' '.join(codewords_hex)}")
 ```
 
-### Penjelasan Implementasi
+# Penjelasan Implementasi
 
 - **`make_segments`**: Fungsi ini membuat segmen dari teks yang diberikan, mengonversi setiap karakter ke representasi biner 8-bit dan mengembalikan daftar segmen.
 - **`encode_segment`**: Fungsi ini mengkodekan data segmen, menambahkan mode indikator, count karakter, dan bit data menjadi satu string bit.
