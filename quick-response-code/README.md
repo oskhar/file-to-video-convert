@@ -2,7 +2,9 @@
 
 #### 0. **Analisis Karakter Unicode**
 
-Dalam proses pembuatan QR Code, langkah pertama adalah menganalisis karakter Unicode dalam teks input untuk menentukan mode encoding yang paling sesuai. QR Code mendukung beberapa mode encoding, yaitu Numeric, Alphanumeric, Byte, dan Kanji, masing-masing dengan kapasitas dan tujuan yang berbeda.
+Dalam proses pembuatan QR Code, langkah pertama adalah menganalisis karakter Unicode dalam teks input untuk menentukan mode encoding yang paling sesuai.
+
+QR Code mendukung beberapa mode encoding, yaitu Numeric, Alphanumeric, Byte, dan Kanji, masing-masing dengan kapasitas dan tujuan yang berbeda.
 
 #### Rincian Karakter
 
@@ -47,52 +49,53 @@ Tabel berikut menunjukkan detail dari setiap karakter dalam teks "Hello, world! 
 
 **Byte Mode** dipilih karena semua karakter dalam teks input bisa di-encode dalam mode ini.
 
-### Implementasi dalam Kode
+### Di mana letak step ini dalam kode?
 
 Bagian kode yang melakukan analisis karakter Unicode dan memilih mode encoding adalah sebagai berikut:
 
 ```python
 class QrSegment:
-    # Mode constants
-    MODE_NUMERIC = 0
-    MODE_ALPHANUMERIC = 1
-    MODE_BYTE = 2
-    MODE_KANJI = 3
+    ...
 
-    def __init__(self, mode, numChars, bitData):
-        self.mode = mode
-        self.numChars = numChars
-        self.bitData = bitData
+	_mode: QrSegment.Mode
 
-    @staticmethod
-    def make_segments(text: str) -> List['QrSegment']:
-        # Analyze each character to determine the mode
-        for char in text:
-            if ord(char) > 255:
-                raise ValueError("All characters must be in the ISO-8859-1 character set for Byte mode.")
+	def __init__(self, mode: QrSegment.Mode, numch: int, bitdata: Sequence[int]) -> None:
+		if numch < 0:
+			raise ValueError()
+		self._mode = mode
+		self._numchars = numch
+		self._bitdata = list(bitdata)
 
-        # In this simplified example, we assume all characters are encoded in byte mode.
-        bitData = []
-        for char in text:
-            # Convert character to its binary representation
-            bits = bin(ord(char))[2:].zfill(8)
-            bitData.extend([int(bit) for bit in bits])
-        return [QrSegment(QrSegment.MODE_BYTE, len(text), bitData)]
+    def get_mode(self) -> QrSegment.Mode:
+        return self._mode
 
-    def get_total_bits_needed(self, version: int) -> int:
-        # The number of bits needed for this segment
-        return len(self.bitData)
-```
+	class Mode:
 
-### Contoh Penggunaan Kode
+		_modebits: int
+		_charcounts: tuple[int,int,int]
 
-```python
-text = "Hello, world! 123"
-segments = QrSegment.make_segments(text)
-for segment in segments:
-    print(f"Mode: {segment.mode}")
-    print(f"Count: {segment.numChars} bytes")
-    print(f"Data: {len(segment.bitData)} bits long")
+		def __init__(self, modebits: int, charcounts: tuple[int,int,int]):
+			self._modebits = modebits
+			self._charcounts = charcounts
+
+		def get_mode_bits(self) -> int:
+			return self._modebits
+
+		def num_char_count_bits(self, ver: int) -> int:
+			return self._charcounts[(ver + 7) // 17]
+
+		NUMERIC     : QrSegment.Mode
+		ALPHANUMERIC: QrSegment.Mode
+		BYTE        : QrSegment.Mode
+		KANJI       : QrSegment.Mode
+		ECI         : QrSegment.Mode
+
+	Mode.NUMERIC      = Mode(0x1, (10, 12, 14))
+	Mode.ALPHANUMERIC = Mode(0x2, ( 9, 11, 13))
+	Mode.BYTE         = Mode(0x4, ( 8, 16, 16))
+	Mode.KANJI        = Mode(0x8, ( 8, 10, 12))
+	Mode.ECI          = Mode(0x7, ( 0,  0,  0))
+    ...
 ```
 
 Output akan menunjukkan bahwa mode Byte dipilih, dengan jumlah byte dan panjang data dalam bit, sesuai dengan hasil analisis.
@@ -148,50 +151,68 @@ Segmen yang dihasilkan dari konversi di atas adalah sebagai berikut:
 4. Kompatibilitas:
    - Semua data digital pada dasarnya adalah biner. Menggunakan representasi biner memungkinkan berbagai jenis data (teks, URL, gambar kecil, dll.) untuk di-encode dalam QR Code dengan cara yang seragam dan dapat diandalkan.
 
-### Implementasi dalam Kode
+### Di mana letak step ini dalam kode?
 
 Dalam kode `QrCode`, pembuatan segmen data bisa dilakukan dengan menggunakan kelas `QrSegment`:
 
 ```python
 class QrSegment:
-    # Mode constants
-    MODE_NUMERIC = 0
-    MODE_ALPHANUMERIC = 1
-    MODE_BYTE = 2
-    MODE_KANJI = 3
 
-    def __init__(self, mode, numChars, bitData):
-        self.mode = mode
-        self.numChars = numChars
-        self.bitData = bitData
+	@staticmethod
+	def make_bytes(data: Union[bytes,Sequence[int]]) -> QrSegment:
+		bb = _BitBuffer()
+		for b in data:
+			bb.append_bits(b, 8)
+		return QrSegment(QrSegment.Mode.BYTE, len(data), bb)
 
-    @staticmethod
-    def make_segments(text: str) -> List['QrSegment']:
-        # In this simplified example, we assume all characters are encoded in byte mode.
-        bitData = []
-        for char in text:
-            # Convert character to its binary representation
-            bits = bin(ord(char))[2:].zfill(8)
-            bitData.extend([int(bit) for bit in bits])
-        return [QrSegment(QrSegment.MODE_BYTE, len(text), bitData)]
 
-    def get_total_bits_needed(self, version: int) -> int:
-        # The number of bits needed for this segment
-        return len(self.bitData)
+	@staticmethod
+	def make_numeric(digits: str) -> QrSegment:
+		if not QrSegment.is_numeric(digits):
+			raise ValueError("String contains non-numeric characters")
+		bb = _BitBuffer()
+		i: int = 0
+		while i < len(digits):
+			n: int = min(len(digits) - i, 3)
+			bb.append_bits(int(digits[i : i + n]), n * 3 + 1)
+			i += n
+		return QrSegment(QrSegment.Mode.NUMERIC, len(digits), bb)
+
+
+	@staticmethod
+	def make_alphanumeric(text: str) -> QrSegment:
+		if not QrSegment.is_alphanumeric(text):
+			raise ValueError("String contains unencodable characters in alphanumeric mode")
+		bb = _BitBuffer()
+		for i in range(0, len(text) - 1, 2):
+			temp: int = QrSegment._ALPHANUMERIC_ENCODING_TABLE[text[i]] * 45
+			temp += QrSegment._ALPHANUMERIC_ENCODING_TABLE[text[i + 1]]
+			bb.append_bits(temp, 11)
+		if len(text) % 2 > 0:
+			bb.append_bits(QrSegment._ALPHANUMERIC_ENCODING_TABLE[text[-1]], 6)
+		return QrSegment(QrSegment.Mode.ALPHANUMERIC, len(text), bb)
+
+	@staticmethod
+	def is_numeric(text: str) -> bool:
+		return QrSegment._NUMERIC_REGEX.fullmatch(text) is not None
+
+	@staticmethod
+	def is_alphanumeric(text: str) -> bool:
+		return QrSegment._ALPHANUMERIC_REGEX.fullmatch(text) is not None
+
+	@staticmethod
+	def make_segments(text: str) -> list[QrSegment]:
+
+		if text == "":
+			return []
+		elif QrSegment.is_numeric(text):
+			return [QrSegment.make_numeric(text)]
+		elif QrSegment.is_alphanumeric(text):
+			return [QrSegment.make_alphanumeric(text)]
+		else:
+			return [QrSegment.make_bytes(text.encode("UTF-8"))]
+    ...
 ```
-
-### Contoh Penggunaan Kode
-
-```python
-text = "Hello, world! 123"
-segments = QrSegment.make_segments(text)
-for segment in segments:
-    print(f"Mode: {segment.mode}")
-    print(f"Count: {segment.numChars} bytes")
-    print(f"Data: {len(segment.bitData)} bits long")
-```
-
-Ini akan menghasilkan output yang serupa dengan deskripsi di atas, menunjukkan mode byte, jumlah byte, dan panjang data dalam bit.
 
 # Penjelasan tentang Step "Fit to Version Number"
 
@@ -262,7 +283,7 @@ Catatan: **Satu codeword** didefinisikan sebagai 8 bit, yang juga dikenal sebaga
 
 **Versi 1** dipilih karena total panjang bit (148 bit) cukup muat dalam kapasitas data codewords versi ini (19 codewords untuk ECC level L).
 
-### Implementasi dalam Kode
+### Di mana letak step ini dalam kode?
 
 Bagian kode yang menyesuaikan dengan nomor versi ini dilakukan di beberapa fungsi, terutama yang terkait dengan menentukan panjang bit dan memilih versi yang sesuai.
 
@@ -274,37 +295,32 @@ Bagian kode yang menyesuaikan dengan nomor versi ini dilakukan di beberapa fungs
 #### Contoh Implementasi
 
 ```python
-class QrSegment:
-    # Existing code for QrSegment
+class QrCode:
+    ...
 
-    def get_total_bits_needed(self, version: int) -> int:
-        # The number of bits needed for this segment
-        return len(self.bitData)
+	_version: int
 
-def fit_to_version(segments: List[QrSegment], ecc: str) -> int:
-    # Dictionary mapping ECC levels to their corresponding codeword capacities per version
-    capacity_table = {
-        'L': [19, 34, 55, 80, 108, 136, 156, 194, 232, 274, 324, 370, 428, 461, 523, 589, 647, 721, 795, 861, 932, 1006, 1094, 1174, 1276, 1370, 1468, 1531, 1631, 1735, 1843, 1955, 2071, 2191, 2306, 2434, 2566, 2702, 2812, 2956],
-        'M': [16, 28, 44, 64, 86, 108, 124, 154, 182, 216, 254, 290, 334, 365, 415, 453, 507, 563, 627, 669, 714, 782, 860, 914, 1000, 1062, 1128, 1193, 1267, 1373, 1455, 1541, 1631, 1725, 1812, 1914, 1992, 2102, 2216, 2334],
-        'Q': [13, 22, 34, 48, 62, 76, 88, 110, 132, 154, 180, 206, 244, 261, 295, 325, 367, 397, 445, 485, 512, 568, 614, 664, 718, 754, 808, 871, 911, 985, 1033, 1115, 1171, 1231, 1286, 1354, 1426, 1502, 1582, 1666],
-        'H': [9, 16, 26, 36, 46, 60, 66, 86, 100, 122, 140, 158, 180, 197, 223, 253, 283, 313, 341, 385, 406, 442, 464, 514, 538, 596, 628, 661, 701, 745, 793, 845, 901, 961, 986, 1054, 1096, 1142, 1222, 1276]
-    }
+	def get_version(self) -> int:
+		return self._version
 
-    total_bits_needed = sum(segment.get_total_bits_needed(1) for segment in segments) + 4 * len(segments)
+	MIN_VERSION: int =  1
+	MAX_VERSION: int = 40
 
-    for version in range(1, 41):
-        num_codewords = (total_bits_needed + 7) // 8
-        if num_codewords <= capacity_table[ecc][version - 1]:
-            return version
-    raise ValueError("Data too large to fit in QR Code")
+    def encode_segments(segs: Sequence[QrSegment], ecl: QrCode.Ecc, minversion: int = 1, maxversion: int = 40, mask: int = -1, boostecl: bool = True) -> QrCode:
 
-# Example usage
-text = "Hello, world! 123
+		if not (QrCode.MIN_VERSION <= minversion <= maxversion <= QrCode.MAX_VERSION) or not (-1 <= mask <= 7):
+			raise ValueError("Invalid value")
+        ...
 
-"
-segments = QrSegment.make_segments(text)
-chosen_version = fit_to_version(segments, 'L')
-print(f"Chosen version number: {chosen_version}")
+
+    def __init__(self, version: int, errcorlvl: QrCode.Ecc, datacodewords: Union[bytes,Sequence[int]], msk: int) -> None:
+		if not (QrCode.MIN_VERSION <= version <= QrCode.MAX_VERSION):
+			raise ValueError("Version value out of range")
+		if not (-1 <= msk <= 7):
+			raise ValueError("Mask value out of range")
+
+		self._version = version
+        ...
 ```
 
 ### Penjelasan Implementasi
@@ -372,7 +388,7 @@ Langkah ini melibatkan penggabungan berbagai string bit, penambahan padding, dan
 41 14 86 56 C6 C6 F2 C2 07 76 F7 26 C6 42 12 03 13 23 30
 ```
 
-### Implementasi dalam Kode
+### Di mana letak step ini dalam kode?
 
 Bagian kode yang menggabungkan segmen, menambah padding, dan membuat codewords ini dapat dilakukan dalam fungsi atau metode yang mengatur bit string akhir dari data yang akan di-encode ke dalam QR Code.
 
