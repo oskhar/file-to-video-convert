@@ -1,7 +1,3 @@
-# encoding: UTF-8
-# Copyright (c) 2010 Andrew Brown <brownan@cs.duke.edu, brownan@gmail.com>
-# See LICENSE.txt for license terms
-
 from ff import GF256int
 from polynomial import Polynomial
 
@@ -43,8 +39,7 @@ class RSCoder(object):
         if not n < 256:
             raise ValueError("n must be at most 255")
         if not k < n:
-            raise ValueError("Codeword length n must be greater than message"
-                    " length k")
+            raise ValueError("Codeword length n must be greater than message length k")
         self.n = n
         self.k = k
 
@@ -52,20 +47,20 @@ class RSCoder(object):
         # g(x) = (x-α^1)(x-α^2)...(x-α^(n-k))
         # α is 3, a generator for GF(2^8)
         g = Polynomial((GF256int(1),))
-        for alpha in xrange(1,n-k+1):
-            p = Polynomial((GF256int(1), GF256int(3)**alpha))
+        for alpha in range(1, n - k + 1):
+            p = Polynomial((GF256int(1), GF256int(3) ** alpha))
             g = g * p
         self.g = g
 
         # h(x) = (x-α^(n-k+1))...(x-α^n)
         h = Polynomial((GF256int(1),))
-        for alpha in xrange(n-k+1,n+1):
-            p = Polynomial((GF256int(1), GF256int(3)**alpha))
+        for alpha in range(n - k + 1, n + 1):
+            p = Polynomial((GF256int(1), GF256int(3) ** alpha))
             h = h * p
         self.h = h
 
         # g*h is used in verification, and is always x^n-1
-        # TODO: This is hardcoded for (255,223)
+        # TODO: This is hardcoded for (255, 223)
         # But it doesn't matter since my verify method doesn't use it
         self.gtimesh = Polynomial(x255=GF256int(1), x0=GF256int(1))
 
@@ -84,15 +79,14 @@ class RSCoder(object):
         n = self.n
         k = self.k
 
-        if len(message)>k:
-            raise ValueError("Message length is max %d. Message was %d" % (k,
-                len(message)))
+        if len(message) > k:
+            raise ValueError("Message length is max %d. Message was %d" % (k, len(message)))
 
         # Encode message as a polynomial:
-        m = Polynomial(GF256int(ord(x)) for x in message)
+        m = Polynomial(GF256int(b) for b in message)
 
         # Shift polynomial up by n-k by multiplying by x^(n-k)
-        mprime = m * Polynomial((GF256int(1),) + (GF256int(0),)*(n-k))
+        mprime = m * Polynomial((GF256int(1),) + (GF256int(0),) * (n - k))
 
         # mprime = q*g + b for some q
         # so let's find b:
@@ -100,33 +94,27 @@ class RSCoder(object):
 
         # Subtract out b, so now c = q*g
         c = mprime - b
-        # Since c is a multiple of g, it has (at least) n-k roots: α^1 through
-        # α^(n-k)
+        # Since c is a multiple of g, it has (at least) n-k roots: α^1 through α^(n-k)
 
         if poly:
             return c
 
         # Turn the polynomial c back into a byte string
-        return "".join(chr(x) for x in c.coefficients).rjust(n, "\0")
+        return bytes(c.coefficients).rjust(n, b"\0")
 
     def verify(self, code):
         """Verifies the code is valid by testing that the code as a polynomial
         code divides g
         returns True/False
         """
-        n = self.n
-        k = self.k
-        h = self.h
-        g = self.g
-
-        c = Polynomial(GF256int(ord(x)) for x in code)
+        c = Polynomial(GF256int(b) for b in code)
 
         # This works too, but takes longer. Both checks are just as valid.
-        #return (c*h)%gtimesh == Polynomial(x0=0)
+        # return (c * self.h) % self.gtimesh == Polynomial(x0=0)
 
         # Since all codewords are multiples of g, checking that code divides g
         # suffices for validating a codeword.
-        return c % g == Polynomial(x0=0)
+        return c % self.g == Polynomial(x0=0)
 
     def decode(self, r, nostrip=False):
         """Given a received string or byte array r, attempts to decode it. If
@@ -145,12 +133,12 @@ class RSCoder(object):
         if self.verify(r):
             # The last n-k bytes are parity
             if nostrip:
-                return r[:-(n-k)]
+                return r[:-(n - k)]
             else:
-                return r[:-(n-k)].lstrip("\0")
+                return r[:-(n - k)].lstrip(b"\0")
 
         # Turn r into a polynomial
-        r = Polynomial(GF256int(ord(x)) for x in r)
+        r = Polynomial(GF256int(b) for b in r)
 
         # Compute the syndromes:
         sz = self._syndromes(r)
@@ -172,7 +160,7 @@ class RSCoder(object):
 
         # Put the error and locations together to form the error polynomial
         Elist = []
-        for i in xrange(255):
+        for i in range(255):
             if i in j:
                 Elist.append(Y[j.index(i)])
             else:
@@ -183,16 +171,14 @@ class RSCoder(object):
         c = r - E
 
         # Form it back into a string and return all but the last n-k bytes
-        ret = "".join(chr(x) for x in c.coefficients[:-(n-k)])
-        #                                            :-(
+        ret = bytes(c.coefficients[:-(n - k)])
 
         if nostrip:
             # Polynomial objects don't store leading 0 coefficients, so we
             # actually need to pad this to k bytes
-            return ret.rjust(k, "\0")
+            return ret.rjust(k, b"\0")
         else:
             return ret
-
 
     def _syndromes(self, r):
         """Given the received codeword r in the form of a Polynomial object,
@@ -203,13 +189,13 @@ class RSCoder(object):
 
         # s[l] is the received codeword evaluated at α^l for 1 <= l <= s
         # α in this implementation is 3
-        s = [GF256int(0)] # s[0] is 0 (coefficient of z^0)
-        for l in xrange(1, n-k+1):
-            s.append( r.evaluate( GF256int(3)**l ) )
+        s = [GF256int(0)]  # s[0] is 0 (coefficient of z^0)
+        for l in range(1, n - k + 1):
+            s.append(r.evaluate(GF256int(3) ** l))
 
         # Now build a polynomial out of all our s[l] values
         # s(z) = sum(s_i * z^i, i=1..inf)
-        sz = Polynomial( reversed( s ) )
+        sz = Polynomial(reversed(s))
 
         return sz
 
@@ -244,12 +230,12 @@ class RSCoder(object):
         k = self.k
 
         # Initialize:
-        sigma =  [ Polynomial((GF256int(1),)) ]
-        omega =  [ Polynomial((GF256int(1),)) ]
-        tao =    [ Polynomial((GF256int(1),)) ]
-        gamma =  [ Polynomial((GF256int(0),)) ]
-        D =      [ 0 ]
-        B =      [ 0 ]
+        sigma = [Polynomial((GF256int(1),))]
+        omega = [Polynomial((GF256int(1),))]
+        tao = [Polynomial((GF256int(1),))]
+        gamma = [Polynomial((GF256int(0),))]
+        D = [0]
+        B = [0]
 
         # Polynomial constants:
         ONE = Polynomial(z0=GF256int(1))
@@ -258,7 +244,7 @@ class RSCoder(object):
         
         # Iteratively compute the polynomials 2s times. The last ones will be
         # correct
-        for l in xrange(0, n-k):
+        for l in range(0, n - k):
             # Goal for each iteration: Compute sigma[l+1] and omega[l+1] such that
             # (1 + s)*sigma[l] == omega[l] in mod z^(l+1)
 
@@ -268,47 +254,46 @@ class RSCoder(object):
             # First find Delta, the non-zero coefficient of z^(l+1) in
             # (1 + s) * sigma[l]
             # This delta is valid for l (this iteration) only
-            Delta = ( (ONE + s) * sigma[l] ).get_coefficient(l+1)
+            Delta = ((ONE + s) * sigma[l]).get_coefficient(l + 1)
             # Make it a polynomial of degree 0
             Delta = Polynomial(x0=Delta)
 
             # Can now compute sigma[l+1] and omega[l+1] from
             # sigma[l], omega[l], tao[l], gamma[l], and Delta
-            sigma.append( sigma[l] - Delta * Z * tao[l] )
-            omega.append( omega[l] - Delta * Z * gamma[l] )
+            sigma.append(sigma[l] - Delta * Z * tao[l])
+            omega.append(omega[l] - Delta * Z * gamma[l])
 
             # Now compute the next tao and gamma
             # There are two ways to do this
-            if Delta == ZERO or 2*D[l] > (l+1):
+            if Delta == ZERO or 2 * D[l] > (l + 1):
                 # Rule A
-                D.append( D[l] )
-                B.append( B[l] )
-                tao.append( Z * tao[l] )
-                gamma.append( Z * gamma[l] )
+                D.append(D[l])
+                B.append(B[l])
+                tao.append(Z * tao[l])
+                gamma.append(Z * gamma[l])
 
-            elif Delta != ZERO and 2*D[l] < (l+1):
+            elif Delta != ZERO and 2 * D[l] < (l + 1):
                 # Rule B
-                D.append( l + 1 - D[l] )
-                B.append( 1 - B[l] )
-                tao.append( sigma[l] // Delta )
-                gamma.append( omega[l] // Delta )
-            elif 2*D[l] == (l+1):
+                D.append(l + 1 - D[l])
+                B.append(1 - B[l])
+                tao.append(sigma[l] // Delta)
+                gamma.append(omega[l] // Delta)
+            elif 2 * D[l] == (l + 1):
                 if B[l] == 0:
                     # Rule A (same as above)
-                    D.append( D[l] )
-                    B.append( B[l] )
-                    tao.append( Z * tao[l] )
-                    gamma.append( Z * gamma[l] )
+                    D.append(D[l])
+                    B.append(B[l])
+                    tao.append(Z * tao[l])
+                    gamma.append(Z * gamma[l])
 
                 else:
                     # Rule B (same as above)
-                    D.append( l + 1 - D[l] )
-                    B.append( 1 - B[l] )
-                    tao.append( sigma[l] // Delta )
-                    gamma.append( omega[l] // Delta )
+                    D.append(l + 1 - D[l])
+                    B.append(1 - B[l])
+                    tao.append(sigma[l] // Delta)
+                    gamma.append(omega[l] // Delta)
             else:
                 raise Exception("Code shouldn't have gotten here")
-
 
         return sigma[-1], omega[-1]
 
@@ -329,32 +314,31 @@ class RSCoder(object):
         X = []
         j = []
         p = GF256int(3)
-        for l in xrange(1,256):
+        for l in range(1, 256):
             # These evaluations could be more efficient, but oh well
-            if sigma.evaluate( p**l ) == 0:
-                X.append( p**(-l) )
+            if sigma.evaluate(p ** l) == 0:
+                X.append(p ** (-l))
                 # This is different than the notes, I think the notes were in error
-                # Notes said j values were just l, when it's actually 255-l
+                # Notes said j values were just l, when it's actually 255 - l
                 j.append(255 - l)
 
         return X, j
 
     def _forney(self, omega, X):
         """Computes the error magnitudes"""
-        # XXX Is floor division okay here? Should this be ceiling?
         s = (self.n - self.k) // 2
 
         Y = []
 
         for l, Xl in enumerate(X):
             # Compute the first part of Yl
-            Yl = Xl**s
-            Yl *= omega.evaluate( Xl.inverse() )
+            Yl = Xl ** s
+            Yl *= omega.evaluate(Xl.inverse())
             Yl *= Xl.inverse()
 
             # Compute the sequence product and multiply its inverse in
             prod = GF256int(1)
-            for ji in xrange(s):
+            for ji in range(s):
                 if ji == l:
                     continue
                 if ji < len(X):
@@ -369,7 +353,7 @@ class RSCoder(object):
 
 if __name__ == "__main__":
     import sys
-    coder = RSCoder(255,223)
+    coder = RSCoder(255, 223)
     if "-d" in sys.argv:
         method = coder.decode
         blocksize = 255
@@ -378,9 +362,8 @@ if __name__ == "__main__":
         blocksize = 223
 
     while True:
-        block = sys.stdin.read(blocksize)
-        if not block: break
+        block = sys.stdin.buffer.read(blocksize)
+        if not block:
+            break
         code = method(block)
-        sys.stdout.write(code)
-
-
+        sys.stdout.buffer.write(code)

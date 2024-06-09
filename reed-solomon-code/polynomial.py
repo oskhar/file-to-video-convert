@@ -1,7 +1,4 @@
-# Copyright (c) 2010 Andrew Brown <brownan@cs.duke.edu, brownan@gmail.com>
-# See LICENSE.txt for license terms
-
-from StringIO import StringIO
+from io import StringIO
 
 class Polynomial(object):
     """Completely general polynomial class.
@@ -26,18 +23,18 @@ class Polynomial(object):
         3) With no arguments, creates an empty polynomial, equivalent to
         Polynomial((0,))
 
-        >>> print Polynomial((5, 0, 0, 0, 0, 0))
+        >>> print(Polynomial((5, 0, 0, 0, 0, 0)))
         5x^5
 
-        >>> print Polynomial(x32=5, x64=8)
+        >>> print(Polynomial(x32=5, x64=8))
         8x^64 + 5x^32
 
-        >>> print Polynomial(x5=5, x9=4, x0=2) 
+        >>> print(Polynomial(x5=5, x9=4, x0=2)) 
         4x^9 + 5x^5 + 2
         """
         if coefficients and sparse:
-            raise TypeError("Specify coefficients list /or/ keyword terms, not"
-                    " both")
+            raise TypeError("Specify coefficients list /or/ keyword terms, not both")
+        
         if coefficients:
             # Polynomial((1, 2, 3, ...))
             c = list(coefficients)
@@ -46,18 +43,14 @@ class Polynomial(object):
                 c.pop(0)
             if not c:
                 c.append(0)
-
             self.coefficients = tuple(c)
         elif sparse:
             # Polynomial(x32=...)
-            powers = sparse.keys()
-            powers.sort(reverse=1)
-            # Not catching possible exceptions from the following line, let
-            # them bubble up.
+            powers = sorted(sparse.keys(), reverse=True)
             highest = int(powers[0][1:])
-            coefficients = [0] * (highest+1)
+            coefficients = [0] * (highest + 1)
 
-            for power, coeff in sparse.iteritems():
+            for power, coeff in sparse.items():
                 power = int(power[1:])
                 coefficients[highest - power] = coeff
 
@@ -69,6 +62,7 @@ class Polynomial(object):
     def __len__(self):
         """Returns the number of terms in the polynomial"""
         return len(self.coefficients)
+
     def degree(self):
         """Returns the degree of the polynomial"""
         return len(self.coefficients) - 1
@@ -82,10 +76,11 @@ class Polynomial(object):
             t1 = (0,) * (-diff) + self.coefficients
             t2 = other.coefficients
 
-        return self.__class__(x+y for x,y in zip(t1, t2))
+        return self.__class__(x + y for x, y in zip(t1, t2))
 
     def __neg__(self):
         return self.__class__(-x for x in self.coefficients)
+
     def __sub__(self, other):
         return self + -other
             
@@ -97,12 +92,13 @@ class Polynomial(object):
                 # Optimization
                 continue
             for i2, c2 in enumerate(reversed(other.coefficients)):
-                terms[i1+i2] += c1*c2
+                terms[i1 + i2] += c1 * c2
 
         return self.__class__(reversed(terms))
 
     def __floordiv__(self, other):
         return divmod(self, other)[0]
+
     def __mod__(self, other):
         return divmod(self, other)[1]
 
@@ -134,8 +130,8 @@ class Polynomial(object):
 
         # Compute how many times the highest order term in the divisor goes
         # into the dividend
-        quotient_coefficient = dividend_coefficient / divisor_coefficient
-        quotient = class_( (quotient_coefficient,) + (0,) * quotient_power )
+        quotient_coefficient = int(dividend_coefficient // divisor_coefficient)
+        quotient = class_((quotient_coefficient,) + (0,) * quotient_power)
 
         remander = dividend - quotient * divisor
 
@@ -150,14 +146,17 @@ class Polynomial(object):
 
     def __eq__(self, other):
         return self.coefficients == other.coefficients
+
     def __ne__(self, other):
         return self.coefficients != other.coefficients
+
     def __hash__(self):
         return hash(self.coefficients)
 
     def __repr__(self):
         n = self.__class__.__name__
-        return "%s(%r)" % (n, self.coefficients)
+        return f"{n}({self.coefficients!r})"
+
     def __str__(self):
         buf = StringIO()
         l = len(self) - 1
@@ -168,11 +167,11 @@ class Polynomial(object):
             if c == 1 and power != 0:
                 c = ""
             if power > 1:
-                buf.write("%sx^%s" % (c, power))
+                buf.write(f"{c}x^{power}")
             elif power == 1:
-                buf.write("%sx" % c)
+                buf.write(f"{c}x")
             else:
-                buf.write("%s" % c)
+                buf.write(f"{c}")
             buf.write(" + ")
         return buf.getvalue()[:-3]
 
@@ -187,7 +186,6 @@ class Polynomial(object):
 
         for term in reversed(self.coefficients):
             c = c + term * p
-
             p = p * x
 
         return c
@@ -197,4 +195,4 @@ class Polynomial(object):
         if degree > self.degree():
             return 0
         else:
-            return self.coefficients[-(degree+1)]
+            return self.coefficients[-(degree + 1)]

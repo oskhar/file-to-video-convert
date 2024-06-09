@@ -1,6 +1,3 @@
-# Copyright (c) 2010 Andrew Brown <brownan@cs.duke.edu, brownan@gmail.com>
-# See LICENSE.txt for license terms
-
 class GF256int(int):
     """Instances of this object are elements of the field GF(2^8)
     Instances are integers in the range 0 to 255
@@ -70,6 +67,7 @@ class GF256int(int):
     __sub__ = __add__
     __radd__ = __add__
     __rsub__ = __add__
+
     def __neg__(self):
         return self
     
@@ -94,14 +92,15 @@ class GF256int(int):
         e = GF256int.logtable[self]
         return GF256int(GF256int.exptable[255 - e])
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         return self * GF256int(other).inverse()
-    def __rdiv__(self, other):
+
+    def __rtruediv__(self, other):
         return self.inverse() * other
 
     def __repr__(self):
         n = self.__class__.__name__
-        return "%s(%r)" % (n, int(self))
+        return f"{n}({int(self)})"
 
     def multiply(self, other):
         """A slow multiply method. This method gives the same results as the
@@ -116,10 +115,11 @@ class GF256int(int):
         p = a
         r = 0
         while b:
-            if b & 1: r = r ^ p
+            if b & 1:
+                r = r ^ p
             b = b >> 1
             p = p << 1
-            if p & 0x100: p = p ^ 0x11b
+            if p & 0x100:
+                p = p ^ 0x11b
 
         return GF256int(r)
-        
