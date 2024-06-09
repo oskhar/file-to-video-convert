@@ -55,7 +55,7 @@ Bagian kode yang melakukan analisis karakter Unicode dan memilih mode encoding a
 
 ```python
 class QrSegment:
-    ...
+    # ... Kode lainnya
 
 	_mode: QrSegment.Mode
 
@@ -95,7 +95,7 @@ class QrSegment:
 	Mode.BYTE         = Mode(0x4, ( 8, 16, 16))
 	Mode.KANJI        = Mode(0x8, ( 8, 10, 12))
 	Mode.ECI          = Mode(0x7, ( 0,  0,  0))
-    ...
+    # ... Kode lainnya
 ```
 
 Output akan menunjukkan bahwa mode Byte dipilih, dengan jumlah byte dan panjang data dalam bit, sesuai dengan hasil analisis.
@@ -156,7 +156,19 @@ Segmen yang dihasilkan dari konversi di atas adalah sebagai berikut:
 Dalam kode `QrCode`, pembuatan segmen data bisa dilakukan dengan menggunakan kelas `QrSegment`:
 
 ```python
+class _BitBuffer(list[int]):
+
+	def append_bits(self, val: int, n: int) -> None:
+		if (n < 0) or (val >> n != 0):
+			raise ValueError("Value out of range")
+		self.extend(((val >> i) & 1) for i in reversed(range(n)))
+
+def _get_bit(x: int, i: int) -> bool:
+	return (x >> i) & 1 != 0
+
 class QrSegment:
+def _get_bit(x: int, i: int) -> bool:
+	return (x >> i) & 1 != 0
 
 	@staticmethod
 	def make_bytes(data: Union[bytes,Sequence[int]]) -> QrSegment:
@@ -211,7 +223,7 @@ class QrSegment:
 			return [QrSegment.make_alphanumeric(text)]
 		else:
 			return [QrSegment.make_bytes(text.encode("UTF-8"))]
-    ...
+    # ... Kode lainnya
 ```
 
 # Penjelasan tentang Step "Fit to Version Number"
@@ -296,7 +308,7 @@ Bagian kode yang menyesuaikan dengan nomor versi ini dilakukan di beberapa fungs
 
 ```python
 class QrCode:
-    ...
+    # ... Kode lainnya
 
 	_version: int
 
@@ -310,7 +322,7 @@ class QrCode:
 
 		if not (QrCode.MIN_VERSION <= minversion <= maxversion <= QrCode.MAX_VERSION) or not (-1 <= mask <= 7):
 			raise ValueError("Invalid value")
-        ...
+        # ... Kode lainnya
 
 
     def __init__(self, version: int, errcorlvl: QrCode.Ecc, datacodewords: Union[bytes,Sequence[int]], msk: int) -> None:
@@ -320,7 +332,7 @@ class QrCode:
 			raise ValueError("Mask value out of range")
 
 		self._version = version
-        ...
+        # ... Kode lainnya
 ```
 
 ### Penjelasan Implementasi
