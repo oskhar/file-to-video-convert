@@ -352,18 +352,42 @@ class RSCoder(object):
         return Y
 
 if __name__ == "__main__":
-    import sys
-    coder = RSCoder(255, 223)
-    if "-d" in sys.argv:
-        method = coder.decode
-        blocksize = 255
-    else:
-        method = coder.encode
-        blocksize = 223
+    def test_rs_coder():
+        print("Testing RS Coder...")
 
-    while True:
-        block = sys.stdin.buffer.read(blocksize)
-        if not block:
-            break
-        code = method(block)
-        sys.stdout.buffer.write(code)
+        # Initialize the RS Coder with typical parameters (255, 223)
+        coder = RSCoder(255, 223)
+
+        # Test message
+        message = b"Hello, Reed-Solomon!"
+        print(f"Original message: {message}")
+
+        # Encode the message
+        encoded_message = coder.encode(message)
+        print(f"Encoded message: {encoded_message}")
+
+        # Decode the message
+        decoded_message = coder.decode(encoded_message)
+        print(f"Decoded message: {decoded_message}")
+
+        # Check if the decoded message matches the original message
+        assert message == decoded_message, "Decoding failed!"
+        print("Decoding successful!")
+
+        # Introduce some errors to the encoded message
+        encoded_message_with_errors = bytearray(encoded_message)
+        encoded_message_with_errors[0] ^= 0xFF  # Invert the first byte
+        encoded_message_with_errors[10] ^= 0xFF  # Invert the 11th byte
+
+        # Decode the corrupted message
+        try:
+            corrected_message = coder.decode(encoded_message_with_errors)
+            print(f"Corrected message: {corrected_message}")
+            assert message == corrected_message, "Error correction failed!"
+            print("Error correction successful!")
+        except Exception as e:
+            print(f"Error correction failed: {e}")
+
+    test_rs_coder()
+
+    print("All tests completed.")

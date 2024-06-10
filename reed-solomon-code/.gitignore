@@ -1,0 +1,9 @@
+venv
+test_not
+.idea
+frames/
+
+myenv/
+menv
+
+__pycache__/

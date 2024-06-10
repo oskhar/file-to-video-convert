@@ -228,7 +228,7 @@ def _get_bit(x: int, i: int) -> bool:
 
 # Penjelasan tentang Step "Fit to Version Number"
 
-#### 2. **Menyesuaikan dengan Nomor Versi**
+#### 2. Menyesuaikan dengan Nomor Versi
 
 Langkah ini bertujuan untuk menentukan versi QR Code yang paling sesuai berdasarkan panjang total bit yang dibutuhkan untuk merepresentasikan daftar segmen.
 
@@ -345,7 +345,7 @@ Dengan demikian, proses ini memastikan bahwa versi QR Code yang dipilih memiliki
 
 # Penjelasan tentang Step "Concatenate Segments, Add Padding, Make Codewords"
 
-#### 3. **Menggabungkan Segmen, Menambah Padding, dan Membuat Codewords**
+#### 3. Menggabungkan Segmen, Menambah Padding, dan Membuat Codewords
 
 Langkah ini melibatkan penggabungan berbagai string bit, penambahan padding, dan pembuatan codewords untuk menghasilkan representasi akhir dari data dalam QR Code.
 
@@ -404,7 +404,7 @@ Langkah ini melibatkan penggabungan berbagai string bit, penambahan padding, dan
 
 Bagian kode yang menggabungkan segmen, menambah padding, dan membuat codewords ini dapat dilakukan dalam fungsi atau metode yang mengatur bit string akhir dari data yang akan di-encode ke dalam QR Code.
 
-#### Contoh Implementasi Kode Python
+#### Di mana letak step ini dalam kode?
 
 ```python
 class QrSegment:
@@ -458,3 +458,272 @@ print(f"Total data codeword bytes (in hexadecimal): {' '.join(codewords_hex)}")
 - **`add_padding`**: Fungsi ini menambahkan terminator, padding bit, dan padding byte untuk mencapai jumlah codewords yang diperlukan. Padding byte terdiri dari nilai `11101100` dan `00010001` yang bergantian hingga kapasitas terpenuhi.
 
 Dengan demikian, proses ini memastikan bahwa data terkodekan secara benar dan sesuai dengan kapasitas QR Code yang dipilih.
+
+# Penjelasan tentang Step "Split Blocks, Add ECC, Interleave"
+
+#### 4. Membagi Blok, Menambah ECC, dan Interleave
+
+Langkah ini melibatkan pembagian data menjadi blok-blok, penambahan kode koreksi kesalahan (ECC), dan penggabungan data (interleaving) dari berbagai blok untuk menghasilkan urutan akhir kode QR.
+
+#### Detail Proses
+
+1. **Jumlah codewords data**:
+
+   - Ini adalah jumlah total codewords yang dihasilkan dari data yang dienkode. Untuk contoh ini, jumlah codewords data adalah 19.
+
+2. **Jumlah blok**:
+
+   - Dalam hal ini, data hanya memerlukan 1 blok karena ukurannya kecil.
+
+3. **Codewords data per blok pendek**:
+
+   - Karena hanya ada satu blok, semua codewords data masuk ke dalam blok ini. Jadi, jumlah codewords per blok pendek adalah 19.
+
+4. **Codewords data per blok panjang**:
+
+   - Tidak ada blok panjang dalam contoh ini (N/A).
+
+5. **Jumlah codewords ECC per blok**:
+
+   - Untuk setiap blok, sejumlah codewords ECC ditambahkan untuk koreksi kesalahan. Dalam contoh ini, jumlah codewords ECC adalah 7.
+
+6. **Jumlah blok pendek**:
+
+   - Terdapat 1 blok pendek dalam contoh ini.
+
+7. **Jumlah blok panjang**:
+   - Tidak ada blok panjang dalam contoh ini.
+
+#### Tabel Pembagian Blok dan ECC
+
+| **Blok** | **Indeks Codeword dalam Blok** | **Data Codewords** | **ECC Codewords** |
+| -------- | ------------------------------ | ------------------ | ----------------- |
+| 0        | 0                              | 41                 | 85                |
+|          | 1                              | 14                 | A9                |
+|          | 2                              | 86                 | 5E                |
+|          | 3                              | 56                 | 07                |
+|          | 4                              | C6                 | 0A                |
+|          | 5                              | C6                 | 36                |
+|          | 6                              | F2                 | C9                |
+|          | 7                              | C2                 |                   |
+|          | 8                              | 07                 |                   |
+|          | 9                              | 76                 |                   |
+|          | 10                             | F7                 |                   |
+|          | 11                             | 26                 |                   |
+|          | 12                             | C6                 |                   |
+|          | 13                             | 42                 |                   |
+|          | 14                             | 12                 |                   |
+|          | 15                             | 03                 |                   |
+|          | 16                             | 13                 |                   |
+|          | 17                             | 23                 |                   |
+|          | 18                             | 30                 |                   |
+
+Dalam tabel ini:
+
+- **Blok** menunjukkan nomor blok (dalam hal ini hanya ada satu blok, yaitu 0).
+- **Indeks Codeword dalam Blok** menunjukkan posisi codeword dalam blok tersebut.
+- **Data Codewords** adalah codewords yang berasal dari data yang dienkode.
+- **ECC Codewords** adalah codewords koreksi kesalahan yang ditambahkan menggunakan algoritma Reed-Solomon.
+
+#### Urutan Final Codewords
+
+Urutan akhir codewords dibentuk dengan menggabungkan codewords data dan ECC dari blok yang berbeda:
+
+```
+41 14 86 56 C6 C6 F2 C2 07 76 F7 26 C6 42 12 03 13 23 30 85 A9 5E 07 0A 36 C9
+```
+
+#### Urutan Bit Akhir untuk Pemindaian Zigzag
+
+Urutan bit akhir yang digunakan untuk pemindaian zigzag dalam QR Code:
+
+```
+0100000100010100100001100101011011000110110001101111001011000010000001110111011011110111001001101100011001000010000100100000001100010011001000110011000010000101101010010101111000000111000010100011011011001001
+```
+
+### Implementasi dalam Kode
+
+Bagian kode yang melakukan pembagian blok, penambahan ECC, dan interleave ini bisa dilakukan dalam beberapa langkah.
+
+#### Di mana letak step ini dalam kode?
+
+```python
+from typing import List
+
+class QrSegment:
+    def __init__(self, mode_indicator: str, char_count: int, bit_data: str):
+        self.mode_indicator = mode_indicator
+        self.char_count = char_count
+        self.bit_data = bit_data
+
+    @staticmethod
+    def make_segments(text: str) -> List['QrSegment']:
+        bit_data = ''.join(f"{ord(c):08b}" for c in text)
+        return [QrSegment(mode_indicator='0100', char_count=len(text), bit_data=bit_data)]
+
+    @staticmethod
+    def encode_segment(segment: 'QrSegment', version: int) -> str:
+        mode_bits = segment.mode_indicator
+        count_bits = f"{segment.char_count:08b}"  # For version 1 and byte mode
+        data_bits = segment.bit_data
+        return mode_bits + count_bits + data_bits
+
+def add_padding(bit_string: str, total_codewords: int) -> str:
+    bit_string += '0000'  # Terminator
+    while len(bit_string) % 8 != 0:
+        bit_string += '0'
+    codewords = [bit_string[i:i+8] for i in range(0, len(bit_string), 8)]
+    while len(codewords) < total_codewords:
+        codewords.append('11101100')
+        if len(codewords) < total_codewords:
+            codewords.append('00010001')
+    return ''.join(codewords)
+
+def compute_ecc(data_codewords: List[int], num_ecc_codewords: int) -> List[int]:
+    # Placeholder function to compute ECC codewords using Reed-Solomon algorithm
+    # Implement the actual Reed-Solomon algorithm as needed
+    return [0x85, 0xA9, 0x5E, 0x07, 0x0A, 0x36, 0xC9]  # Example ECC codewords
+
+def split_blocks(data_codewords: List[str], num_blocks: int, num_ecc_codewords: int) -> List[List[str]]:
+    # For simplicity, assume all data fits into a single block
+    return [data_codewords]
+
+# Example usage
+text = "Hello, world! 123"
+segments = QrSegment.make_segments(text)
+encoded_data = ''.join(QrSegment.encode_segment(seg, 1) for seg in segments)
+padded_data = add_padding(encoded_data, 19)
+
+# Convert padded_data to a list of integers (codewords)
+data_codewords = [int(padded_data[i:i+8], 2) for i in range(0, len(padded_data), 8)]
+
+# Split data codewords into blocks
+blocks = split_blocks(data_codewords, 1, 7)
+
+# Add ECC to each block
+final_blocks = []
+for block in blocks:
+    ecc_codewords = compute_ecc(block, 7)
+    final_blocks.append(block + ecc_codewords)
+
+# Interleave data and ECC codewords from blocks
+interleaved_codewords = []
+for i in range(len(final_blocks[0])):
+    for block in final_blocks:
+        if i < len(block):
+            interleaved_codewords.append(block[i])
+
+# Convert interleaved codewords to binary string
+final_bit_string = ''.join(f"{codeword:08b}" for codeword in interleaved_codewords)
+
+print(f"Final sequence of codewords (hex): {' '.join(f'{codeword:02X}' for codeword in interleaved_codewords)}")
+print(f"Final sequence of bits to draw in the zigzag scan: {final_bit_string}")
+```
+
+### Penjelasan Implementasi
+
+- **`compute_ecc`**: Fungsi ini adalah placeholder untuk menghitung codewords ECC menggunakan algoritma Reed-Solomon. Untuk contoh ini, nilai ECC adalah contoh statis.
+- **`split_blocks`**: Fungsi ini membagi data codewords menjadi blok-blok. Karena hanya ada satu blok, semua codewords dimasukkan ke dalam satu blok.
+- **`add_padding`**: Fungsi ini menambahkan terminator, padding bit, dan padding byte seperti yang dijelaskan sebelumnya.
+- **Interleave**: Interleave menggabungkan data codewords dan ECC codewords dari berbagai blok. Karena hanya ada satu blok, interleaving langsung menghasilkan urutan akhir codewords.
+
+Dengan cara ini, langkah-langkah tersebut memastikan bahwa data yang dikodekan di QR Code siap untuk digambar dalam pola zigzag di dalam matriks QR Code.
+
+### Penjelasan tentang Step "Draw Fixed Patterns"
+
+#### 5. **Menggambar Pola Tetap (Fixed Patterns)**
+
+Langkah ini melibatkan menggambar pola-pola tetap pada matriks QR Code. Pola-pola ini mencakup pola finder, pola timing, dan bit format dummy sementara. Langkah ini penting untuk memastikan QR Code dapat dibaca dengan benar oleh scanner.
+
+#### Detail Proses
+
+1. **Menggambar Pola Timing (Timing Patterns)**:
+
+   - Pola timing horizontal dan vertikal digambar pada baris ke-6 dan kolom ke-6 dari matriks (dengan penghitungan dimulai dari 0 di pojok kiri atas).
+   - Pola ini terdiri dari modul hitam dan putih yang bergantian, dan membantu scanner dalam menentukan koordinat modul QR Code.
+
+2. **Menggambar Pola Finder (Finder Patterns)**:
+
+   - Pola finder digambar di tiga sudut matriks QR Code (pojok kiri atas, pojok kanan atas, dan pojok kiri bawah).
+   - Setiap pola finder berukuran 8×8 modul, termasuk separator putih di sekelilingnya.
+   - Pola finder ini terdiri dari modul hitam-putih konsentris yang membantu dalam menemukan dan mengorientasikan QR Code.
+
+3. **Menggambar Bit Format Dummy Sementara (Temporary Dummy Format Bits)**:
+   - Bit format sementara digambar berdekatan dengan pola finder.
+   - Ini akan ditimpa nanti dengan bit format yang sebenarnya setelah data dan ECC telah ditambahkan.
+
+#### Di mana letak step ini dalam kode?
+
+Bagian kode berikut akan mengilustrasikan bagaimana pola-pola ini digambar pada matriks QR Code.
+
+```python
+import numpy as np
+
+def draw_finder_pattern(matrix: np.ndarray, x: int, y: int):
+    size = matrix.shape[0]
+    pattern = [
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 0, 1],
+        [1, 0, 1, 1, 1, 0, 1],
+        [1, 0, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+    ]
+    for i in range(7):
+        for j in range(7):
+            if 0 <= x + i < size and 0 <= y + j < size:
+                matrix[x + i, y + j] = pattern[i][j]
+
+def draw_timing_patterns(matrix: np.ndarray):
+    size = matrix.shape[0]
+    for i in range(8, size - 8):
+        matrix[6, i] = 1 if i % 2 == 0 else 0
+        matrix[i, 6] = 1 if i % 2 == 0 else 0
+
+def draw_fixed_patterns(matrix: np.ndarray):
+    size = matrix.shape[0]
+    draw_finder_pattern(matrix, 0, 0)
+    draw_finder_pattern(matrix, 0, size - 7)
+    draw_finder_pattern(matrix, size - 7, 0)
+    draw_timing_patterns(matrix)
+
+    # Draw format information areas (temporary dummy)
+    for i in range(8):
+        if i != 6:
+            matrix[i, 8] = 0  # Left format info
+            matrix[8, i] = 0  # Top format info
+            matrix[size - 1 - i, 8] = 0  # Bottom format info
+            matrix[8, size - 1 - i] = 0  # Right format info
+    matrix[8, 8] = 0  # Dark module
+
+# Example usage
+size = 21  # For version 1 QR Code
+matrix = np.full((size, size), -1)  # Initialize matrix with -1 (unassigned)
+draw_fixed_patterns(matrix)
+
+# Convert matrix to a more readable format for display
+display_matrix = [[' ' if cell == -1 else '█' if cell == 1 else ' ' for cell in row] for row in matrix]
+
+for row in display_matrix:
+    print(' '.join(row))
+```
+
+### Penjelasan Implementasi
+
+1. **`draw_finder_pattern`**:
+
+   - Fungsi ini menggambar pola finder pada posisi (x, y) yang ditentukan. Pola finder terdiri dari modul hitam (1) dan putih (0) dalam susunan tertentu.
+
+2. **`draw_timing_patterns`**:
+
+   - Fungsi ini menggambar pola timing horizontal dan vertikal pada baris ke-6 dan kolom ke-6 dari matriks. Pola timing terdiri dari modul hitam dan putih yang bergantian.
+
+3. **`draw_fixed_patterns`**:
+   - Fungsi ini memanggil `draw_finder_pattern` untuk menggambar tiga pola finder pada pojok kiri atas, pojok kanan atas, dan pojok kiri bawah dari matriks.
+   - Juga memanggil `draw_timing_patterns` untuk menggambar pola timing.
+   - Menggambar bit format dummy sementara di dekat pola finder, ini akan diganti nanti dengan bit format yang sebenarnya setelah data dan ECC telah ditambahkan.
+
+### Kesimpulan
+
+Dengan menggambar pola-pola tetap ini, kita menyiapkan matriks QR Code untuk menampung data dan bit koreksi kesalahan (ECC). Pola-pola ini membantu scanner QR Code untuk menemukan, mengorientasikan, dan membaca QR Code dengan benar.
