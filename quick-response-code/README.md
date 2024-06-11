@@ -322,7 +322,48 @@ class QrCode:
 
 		if not (QrCode.MIN_VERSION <= minversion <= maxversion <= QrCode.MAX_VERSION) or not (-1 <= mask <= 7):
 			raise ValueError("Invalid value")
-        # ... Kode lainnya
+
+		for version in range(minversion, maxversion + 1):
+			datacapacitybits: int = QrCode._get_num_data_codewords(version, ecl) * 8
+			datausedbits: Optional[int] = QrSegment.get_total_bits(segs, version)
+			if (datausedbits is not None) and (datausedbits <= datacapacitybits):
+				break
+
+			if version >= maxversion:
+				msg: str = "Segment too long"
+				if datausedbits is not None:
+					msg = f"Data length = {datausedbits} bits, Max capacity = {datacapacitybits} bits"
+				raise DataTooLongError(msg)
+
+		assert datausedbits is not None
+
+		for newecl in (QrCode.Ecc.MEDIUM, QrCode.Ecc.QUARTILE, QrCode.Ecc.HIGH):
+			if boostecl and (datausedbits <= QrCode._get_num_data_codewords(version, newecl) * 8):
+				ecl = newecl
+
+		bb = _BitBuffer()
+		for seg in segs:
+			bb.append_bits(seg.get_mode().get_mode_bits(), 4)
+			bb.append_bits(seg.get_num_chars(), seg.get_mode().num_char_count_bits(version))
+			bb.extend(seg._bitdata)
+		assert len(bb) == datausedbits
+
+		datacapacitybits = QrCode._get_num_data_codewords(version, ecl) * 8
+		assert len(bb) <= datacapacitybits
+		bb.append_bits(0, min(4, datacapacitybits - len(bb)))
+		bb.append_bits(0, -len(bb) % 8)
+		assert len(bb) % 8 == 0
+
+		for padbyte in itertools.cycle((0xEC, 0x11)):
+			if len(bb) >= datacapacitybits:
+				break
+			bb.append_bits(padbyte, 8)
+
+		datacodewords = bytearray([0] * (len(bb) // 8))
+		for (i, bit) in enumerate(bb):
+			datacodewords[i >> 3] |= bit << (7 - (i & 7))
+
+		return QrCode(version, ecl, datacodewords, mask)
 
 
     def __init__(self, version: int, errcorlvl: QrCode.Ecc, datacodewords: Union[bytes,Sequence[int]], msk: int) -> None:
@@ -400,10 +441,6 @@ Langkah ini melibatkan penggabungan berbagai string bit, penambahan padding, dan
 41 14 86 56 C6 C6 F2 C2 07 76 F7 26 C6 42 12 03 13 23 30
 ```
 
-### Di mana letak step ini dalam kode?
-
-Bagian kode yang menggabungkan segmen, menambah padding, dan membuat codewords ini dapat dilakukan dalam fungsi atau metode yang mengatur bit string akhir dari data yang akan di-encode ke dalam QR Code.
-
 #### Di mana letak step ini dalam kode?
 
 ```python
@@ -450,14 +487,6 @@ print(f"Total bit sequence: {padded_data}")
 codewords_hex = [f"{int(padded_data[i:i+8], 2):02X}" for i in range(0, len(padded_data), 8)]
 print(f"Total data codeword bytes (in hexadecimal): {' '.join(codewords_hex)}")
 ```
-
-# Penjelasan Implementasi
-
-- **`make_segments`**: Fungsi ini membuat segmen dari teks yang diberikan, mengonversi setiap karakter ke representasi biner 8-bit dan mengembalikan daftar segmen.
-- **`encode_segment`**: Fungsi ini mengkodekan data segmen, menambahkan mode indikator, count karakter, dan bit data menjadi satu string bit.
-- **`add_padding`**: Fungsi ini menambahkan terminator, padding bit, dan padding byte untuk mencapai jumlah codewords yang diperlukan. Padding byte terdiri dari nilai `11101100` dan `00010001` yang bergantian hingga kapasitas terpenuhi.
-
-Dengan demikian, proses ini memastikan bahwa data terkodekan secara benar dan sesuai dengan kapasitas QR Code yang dipilih.
 
 # Penjelasan tentang Step "Split Blocks, Add ECC, Interleave"
 
@@ -619,15 +648,6 @@ final_bit_string = ''.join(f"{codeword:08b}" for codeword in interleaved_codewor
 print(f"Final sequence of codewords (hex): {' '.join(f'{codeword:02X}' for codeword in interleaved_codewords)}")
 print(f"Final sequence of bits to draw in the zigzag scan: {final_bit_string}")
 ```
-
-### Penjelasan Implementasi
-
-- **`compute_ecc`**: Fungsi ini adalah placeholder untuk menghitung codewords ECC menggunakan algoritma Reed-Solomon. Untuk contoh ini, nilai ECC adalah contoh statis.
-- **`split_blocks`**: Fungsi ini membagi data codewords menjadi blok-blok. Karena hanya ada satu blok, semua codewords dimasukkan ke dalam satu blok.
-- **`add_padding`**: Fungsi ini menambahkan terminator, padding bit, dan padding byte seperti yang dijelaskan sebelumnya.
-- **Interleave**: Interleave menggabungkan data codewords dan ECC codewords dari berbagai blok. Karena hanya ada satu blok, interleaving langsung menghasilkan urutan akhir codewords.
-
-Dengan cara ini, langkah-langkah tersebut memastikan bahwa data yang dikodekan di QR Code siap untuk digambar dalam pola zigzag di dalam matriks QR Code.
 
 ### Penjelasan tentang Step "Draw Fixed Patterns"
 
