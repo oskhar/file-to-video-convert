@@ -1,51 +1,51 @@
 from ff import GF256int
 from polynomial import Polynomial
 
-"""This module implements Reed-Solomon Encoding.
-It supports arbitrary configurations for n and k, the codeword length and
-message length. This can be used to adjust the error correcting power of the
-code.
+"""Modul ini mengimplementasikan Pengkodean Reed-Solomon.
+Ini mendukung konfigurasi arbitrer untuk n dan k, panjang kata kode dan
+panjang pesan. Ini dapat digunakan untuk menyesuaikan kekuatan koreksi kesalahan dari
+kode.
 
-Warning: Because of the way I've implemented things, leading null bytes in a
-message are dropped. Be careful if encoding binary data, pad the data yourself
-to k bytes per block to avoid problems. Also see the nostrip option to
+Peringatan: Karena cara saya mengimplementasikannya, byte nol awal dalam sebuah
+pesan akan dijatuhkan. Hati-hati jika mengkodekan data biner, tambahkan padding data Anda sendiri
+ke k byte per blok untuk menghindari masalah. Lihat juga opsi nostrip untuk
 decode().
 
-When called as a script, this file encodes data from standard in and outputs it
-to standard out, using the standard RS code 255,223. This is suitable for
-encoding text and trying it out, but don't try to encode binary data with it!
+Ketika dipanggil sebagai skrip, file ini mengkodekan data dari standar masukan dan mengeluarkannya
+ke standar keluaran, menggunakan kode RS standar 255,223. Ini cocok untuk
+mengkodekan teks dan mencobanya, tetapi jangan coba untuk mengkodekan data biner dengan itu!
 
-When encoding, it outputs blocks of 255 bytes, 223 of them are data (padded
-with leading null bytes if necessary) and then 32 bytes of parity data.
+Saat mengkodekan, ini mengeluarkan blok 255 byte, 223 di antaranya adalah data (dipad
+dengan byte nol awal jika perlu) dan kemudian 32 byte data paritas.
 
-Use the -d flag to decode data on standard in to standard out. This reads in
-blocks of 255 bytes, and outputs the decoded data from them. If there are less
-than 16 errors per block, your data will be recovered.
+Gunakan flag -d untuk mendekode data pada standar masukan ke standar keluaran. Ini membaca dalam
+blok 255 byte, dan mengeluarkan data yang didekode dari mereka. Jika ada kurang dari
+16 kesalahan per blok, data Anda akan dipulihkan.
 """
 
 class RSCoder(object):
     def __init__(self, n, k):
-        """Creates a new Reed-Solomon Encoder/Decoder object configured with
-        the given n and k values.
-        n is the length of a codeword, must be less than 256
-        k is the length of the message, must be less than n
+        """Membuat objek Pengkode/Pendekode Reed-Solomon baru yang dikonfigurasi dengan
+        nilai n dan k yang diberikan.
+        n adalah panjang kata kode, harus kurang dari 256
+        k adalah panjang pesan, harus kurang dari n
 
-        The code will have error correcting power s where 2s = n - k
+        Kode akan memiliki kekuatan koreksi kesalahan s di mana 2s = n - k
 
-        The typical RSCoder is RSCoder(255, 223)
+        RSCoder tipikal adalah RSCoder(255, 223)
         """
         if n < 0 or k < 0:
-            raise ValueError("n and k must be positive")
+            raise ValueError("n dan k harus positif")
         if not n < 256:
-            raise ValueError("n must be at most 255")
+            raise ValueError("n harus paling banyak 255")
         if not k < n:
-            raise ValueError("Codeword length n must be greater than message length k")
+            raise ValueError("Panjang kata kode n harus lebih besar dari panjang pesan k")
         self.n = n
         self.k = k
 
-        # Generate the generator polynomial for RS codes
+        # Hasilkan polinomial generator untuk kode RS
         # g(x) = (x-α^1)(x-α^2)...(x-α^(n-k))
-        # α is 3, a generator for GF(2^8)
+        # α adalah 3, generator untuk GF(2^8)
         g = Polynomial((GF256int(1),))
         for alpha in range(1, n - k + 1):
             p = Polynomial((GF256int(1), GF256int(3) ** alpha))
@@ -59,106 +59,102 @@ class RSCoder(object):
             h = h * p
         self.h = h
 
-        # g*h is used in verification, and is always x^n-1
-        # TODO: This is hardcoded for (255, 223)
-        # But it doesn't matter since my verify method doesn't use it
+        # g*h digunakan dalam verifikasi, dan selalu x^n-1
+        # TODO: Ini di-hardcode untuk (255, 223)
+        # Tapi tidak masalah karena metode verifikasi saya tidak menggunakannya
         self.gtimesh = Polynomial(x255=GF256int(1), x0=GF256int(1))
 
     def encode(self, message, poly=False):
-        """Encode a given string with reed-solomon encoding. Returns a byte
-        string with the k message bytes and n-k parity bytes at the end.
+        """Mengkodekan string yang diberikan dengan pengkodean reed-solomon. Mengembalikan byte
+        string dengan k byte pesan dan n-k byte paritas di akhir.
         
-        If a message is < k bytes long, it is assumed to be padded at the front
-        with null bytes.
+        Jika pesan < k byte panjangnya, diasumsikan telah dipad di depan
+        dengan byte nol.
 
-        The sequence returned is always n bytes long.
+        Urutan yang dikembalikan selalu n byte panjang.
 
-        If poly is not False, returns the encoded Polynomial object instead of
-        the polynomial translated back to a string (useful for debugging)
+        Jika poly bukan False, mengembalikan objek Polynomial yang dikodekan sebagai gantinya
+        dari polinomial yang diterjemahkan kembali ke string (berguna untuk debugging)
         """
         n = self.n
         k = self.k
 
         if len(message) > k:
-            raise ValueError("Message length is max %d. Message was %d" % (k, len(message)))
+            raise ValueError("Panjang pesan maksimal %d. Pesan adalah %d" % (k, len(message)))
 
-        # Encode message as a polynomial:
+        # Kodekan pesan sebagai polinomial:
         m = Polynomial(GF256int(b) for b in message)
 
-        # Shift polynomial up by n-k by multiplying by x^(n-k)
+        # Geser polinomial ke atas dengan n-k dengan mengalikan dengan x^(n-k)
         mprime = m * Polynomial((GF256int(1),) + (GF256int(0),) * (n - k))
 
-        # mprime = q*g + b for some q
-        # so let's find b:
+        # mprime = q*g + b untuk beberapa q
+        # jadi mari kita temukan b:
         b = mprime % self.g
 
-        # Subtract out b, so now c = q*g
+        # Kurangi b, jadi sekarang c = q*g
         c = mprime - b
-        # Since c is a multiple of g, it has (at least) n-k roots: α^1 through α^(n-k)
+        # Karena c adalah kelipatan dari g, itu memiliki (setidaknya) n-k akar: α^1 hingga α^(n-k)
 
         if poly:
             return c
 
-        # Turn the polynomial c back into a byte string
+        # Ubah polinomial c kembali menjadi string byte
         return bytes(c.coefficients).rjust(n, b"\0")
 
     def verify(self, code):
-        """Verifies the code is valid by testing that the code as a polynomial
-        code divides g
-        returns True/False
+        """Memverifikasi kode valid dengan menguji bahwa kode sebagai polinomial
+        kode membagi g
+        mengembalikan True/False
         """
         c = Polynomial(GF256int(b) for b in code)
 
-        # This works too, but takes longer. Both checks are just as valid.
+        # Ini juga berfungsi, tetapi memakan waktu lebih lama. Kedua pemeriksaan sama validnya.
         # return (c * self.h) % self.gtimesh == Polynomial(x0=0)
 
-        # Since all codewords are multiples of g, checking that code divides g
-        # suffices for validating a codeword.
+        # Karena semua kata kode adalah kelipatan dari g, memeriksa bahwa kode membagi g
+        # cukup untuk memvalidasi kata kode.
         return c % self.g == Polynomial(x0=0)
 
     def decode(self, r, nostrip=False):
-        """Given a received string or byte array r, attempts to decode it. If
-        it's a valid codeword, or if there are no more than (n-k)/2 errors, the
-        message is returned.
+        """Diberikan string atau array byte yang diterima r, mencoba untuk mendekodenya. Jika
+        itu adalah kata kode yang valid, atau jika tidak lebih dari (n-k)/2 kesalahan, pesan
+        dikembalikan.
 
-        A message always has k bytes, if a message contained less it is left
-        padded with null bytes. When decoded, these leading null bytes are
-        stripped, but that can cause problems if decoding binary data. When
-        nostrip is True, messages returned are always k bytes long. This is
-        useful to make sure no data is lost when decoding binary data.
+        Pesan selalu memiliki k byte, jika pesan berisi kurang itu dibiarkan dengan padding byte nol di depan. Saat didekode, byte nol awal ini dihilangkan, tetapi itu dapat menyebabkan masalah jika mendekode data biner. Ketika nostrip adalah True, pesan yang dikembalikan selalu sepanjang k byte. Ini berguna untuk memastikan tidak ada data yang hilang saat mendekode data biner.
         """
         n = self.n
         k = self.k
 
         if self.verify(r):
-            # The last n-k bytes are parity
+            # n-k byte terakhir adalah paritas
             if nostrip:
                 return r[:-(n - k)]
             else:
                 return r[:-(n - k)].lstrip(b"\0")
 
-        # Turn r into a polynomial
+        # Ubah r menjadi polinomial
         r = Polynomial(GF256int(b) for b in r)
 
-        # Compute the syndromes:
+        # Hitung sindrom:
         sz = self._syndromes(r)
 
-        # Find the error locator polynomial and error evaluator polynomial
-        # using the Berlekamp-Massey algorithm
+        # Temukan polinomial lokator kesalahan dan polinomial evaluator kesalahan
+        # menggunakan algoritma Berlekamp-Massey
         sigma, omega = self._berlekamp_massey(sz)
 
-        # Now use Chien's procedure to find the error locations
-        # j is an array of integers representing the positions of the errors, 0
-        # being the rightmost byte
-        # X is a corresponding array of GF(2^8) values where X_i = alpha^(j_i)
+        # Sekarang gunakan prosedur Chien untuk menemukan lokasi kesalahan
+        # j adalah array integer yang mewakili posisi kesalahan, 0
+        # menjadi byte paling kanan
+        # X adalah array yang sesuai dari nilai GF(2^8) di mana X_i = alpha^(j_i)
         X, j = self._chien_search(sigma)
 
-        # And finally, find the error magnitudes with Forney's Formula
-        # Y is an array of GF(2^8) values corresponding to the error magnitude
-        # at the position given by the j array
+        # Dan akhirnya, temukan besaran kesalahan dengan Formula Forney
+        # Y adalah array nilai GF(2^8) yang sesuai dengan besaran kesalahan
+        # di posisi yang diberikan oleh array j
         Y = self._forney(omega, X)
 
-        # Put the error and locations together to form the error polynomial
+        # Gabungkan kesalahan dan lokasi bersama-sama untuk membentuk polinomial kesalahan
         Elist = []
         for i in range(255):
             if i in j:
@@ -167,69 +163,69 @@ class RSCoder(object):
                 Elist.append(GF256int(0))
         E = Polynomial(reversed(Elist))
 
-        # And we get our real codeword!
+        # Dan kita mendapatkan kata kode sebenarnya!
         c = r - E
 
-        # Form it back into a string and return all but the last n-k bytes
+        # Bentuk kembali menjadi string dan kembalikan semua kecuali n-k byte terakhir
         ret = bytes(c.coefficients[:-(n - k)])
 
         if nostrip:
-            # Polynomial objects don't store leading 0 coefficients, so we
-            # actually need to pad this to k bytes
+            # Objek Polynomial tidak menyimpan koefisien 0 awal, jadi kita
+            # sebenarnya perlu menambahkan padding ini ke k byte
             return ret.rjust(k, b"\0")
         else:
             return ret
 
     def _syndromes(self, r):
-        """Given the received codeword r in the form of a Polynomial object,
-        computes the syndromes and returns the syndrome polynomial
+        """Diberikan kata kode yang diterima r dalam bentuk objek Polynomial,
+        menghitung sindrom dan mengembalikan polinomial sindrom
         """
         n = self.n
         k = self.k
 
-        # s[l] is the received codeword evaluated at α^l for 1 <= l <= s
-        # α in this implementation is 3
-        s = [GF256int(0)]  # s[0] is 0 (coefficient of z^0)
+        # s[l] adalah kata kode yang diterima dievaluasi pada α^l untuk 1 <= l <= s
+        # α dalam implementasi ini adalah 3
+        s = [GF256int(0)]  # s[0] adalah 0 (koefisien dari z^0)
         for l in range(1, n - k + 1):
             s.append(r.evaluate(GF256int(3) ** l))
 
-        # Now build a polynomial out of all our s[l] values
+        # Sekarang bangun polinomial dari semua nilai s[l] kita
         # s(z) = sum(s_i * z^i, i=1..inf)
         sz = Polynomial(reversed(s))
 
         return sz
 
     def _berlekamp_massey(self, s):
-        """Computes and returns the error locator polynomial (sigma) and the
-        error evaluator polynomial (omega)
-        The parameter s is the syndrome polynomial (syndromes encoded in a
-        generator function) as returned by _syndromes. Don't be confused with
-        the other s = (n-k)/2
+        """Menghitung dan mengembalikan polinomial lokator kesalahan (sigma) dan polinomial
+        evaluator kesalahan (omega)
+        Parameter s adalah polinomial sindrom (sindrom dikodekan dalam fungsi
+        generator) seperti yang dikembalikan oleh _syndromes. Jangan bingung dengan
+        s lainnya = (n-k)/2
 
-        Notes:
-        The error polynomial:
+        Catatan:
+        Polinomial kesalahan:
         E(x) = E_0 + E_1 x + ... + E_(n-1) x^(n-1)
 
-        j_1, j_2, ..., j_s are the error positions. (There are at most s
-        errors)
+        j_1, j_2, ..., j_s adalah posisi kesalahan. (Ada paling banyak s
+        kesalahan)
 
-        Error location X_i is defined: X_i = α^(j_i)
-        that is, the power of α corresponding to the error location
+        Lokasi kesalahan X_i didefinisikan: X_i = α^(j_i)
+        yaitu, pangkat α yang sesuai dengan lokasi kesalahan
 
-        Error magnitude Y_i is defined: E_(j_i)
-        that is, the coefficient in the error polynomial at position j_i
+        Besaran kesalahan Y_i didefinisikan: E_(j_i)
+        yaitu, koefisien dalam polinomial kesalahan di posisi j_i
 
-        Error locator polynomial:
-        sigma(z) = Product( 1 - X_i * z, i=1..s )
-        roots are the reciprocals of the error locations
+        Polinomial lokator kesalahan:
+        sigma(z) = Produk( 1 - X_i * z, i=1..s )
+        akar adalah kebalikan dari lokasi kesalahan
         ( 1/X_1, 1/X_2, ...)
 
-        Error evaluator polynomial omega(z) not written here
+        Polinomial evaluator kesalahan omega(z) tidak ditulis di sini
         """
         n = self.n
         k = self.k
 
-        # Initialize:
+        # Inisialisasi:
         sigma = [Polynomial((GF256int(1),))]
         omega = [Polynomial((GF256int(1),))]
         tao = [Polynomial((GF256int(1),))]
@@ -237,106 +233,105 @@ class RSCoder(object):
         D = [0]
         B = [0]
 
-        # Polynomial constants:
+        # Konstanta polinomial:
         ONE = Polynomial(z0=GF256int(1))
         ZERO = Polynomial(z0=GF256int(0))
         Z = Polynomial(z1=GF256int(1))
         
-        # Iteratively compute the polynomials 2s times. The last ones will be
-        # correct
+        # Secara iteratif menghitung polinomial 2s kali. Yang terakhir akan benar
         for l in range(0, n - k):
-            # Goal for each iteration: Compute sigma[l+1] and omega[l+1] such that
-            # (1 + s)*sigma[l] == omega[l] in mod z^(l+1)
+            # Tujuan untuk setiap iterasi: Menghitung sigma[l+1] dan omega[l+1] sehingga
+            # (1 + s)*sigma[l] == omega[l] dalam mod z^(l+1)
 
-            # For this particular loop iteration, we have sigma[l] and omega[l],
-            # and are computing sigma[l+1] and omega[l+1]
+            # Untuk iterasi loop ini, kita memiliki sigma[l] dan omega[l],
+            # dan sedang menghitung sigma[l+1] dan omega[l+1]
             
-            # First find Delta, the non-zero coefficient of z^(l+1) in
+            # Pertama temukan Delta, koefisien non-nol dari z^(l+1) dalam
             # (1 + s) * sigma[l]
-            # This delta is valid for l (this iteration) only
+                        # Delta ini valid untuk l (iterasi ini) saja
             Delta = ((ONE + s) * sigma[l]).get_coefficient(l + 1)
-            # Make it a polynomial of degree 0
+            # Jadikan itu polinomial derajat 0
             Delta = Polynomial(x0=Delta)
 
-            # Can now compute sigma[l+1] and omega[l+1] from
-            # sigma[l], omega[l], tao[l], gamma[l], and Delta
+            # Sekarang hitung sigma[l+1] dan omega[l+1] dari
+            # sigma[l], omega[l], tao[l], gamma[l], dan Delta
             sigma.append(sigma[l] - Delta * Z * tao[l])
             omega.append(omega[l] - Delta * Z * gamma[l])
 
-            # Now compute the next tao and gamma
-            # There are two ways to do this
+            # Sekarang hitung tao dan gamma berikutnya
+            # Ada dua cara untuk melakukan ini
             if Delta == ZERO or 2 * D[l] > (l + 1):
-                # Rule A
+                # Aturan A
                 D.append(D[l])
                 B.append(B[l])
                 tao.append(Z * tao[l])
                 gamma.append(Z * gamma[l])
 
             elif Delta != ZERO and 2 * D[l] < (l + 1):
-                # Rule B
+                # Aturan B
                 D.append(l + 1 - D[l])
                 B.append(1 - B[l])
                 tao.append(sigma[l] // Delta)
                 gamma.append(omega[l] // Delta)
             elif 2 * D[l] == (l + 1):
                 if B[l] == 0:
-                    # Rule A (same as above)
+                    # Aturan A (sama seperti di atas)
                     D.append(D[l])
                     B.append(B[l])
                     tao.append(Z * tao[l])
                     gamma.append(Z * gamma[l])
 
                 else:
-                    # Rule B (same as above)
+                    # Aturan B (sama seperti di atas)
                     D.append(l + 1 - D[l])
                     B.append(1 - B[l])
                     tao.append(sigma[l] // Delta)
                     gamma.append(omega[l] // Delta)
             else:
-                raise Exception("Code shouldn't have gotten here")
+                raise Exception("Kode tidak seharusnya sampai di sini")
 
         return sigma[-1], omega[-1]
 
     def _chien_search(self, sigma):
-        """Recall the definition of sigma, it has s roots. To find them, this
-        function evaluates sigma at all 255 non-zero points to find the roots
-        The inverse of the roots are X_i, the error locations
+        """Ingat definisi sigma, itu memiliki s akar. Untuk menemukannya, fungsi ini
+        mengevaluasi sigma di semua 255 titik non-nol untuk menemukan akarnya
+        Kebalikan dari akar adalah X_i, lokasi kesalahan
 
-        Returns a list X of error locations, and a corresponding list j of
-        error positions (the discrete log of the corresponding X value) The
-        lists are up to s elements large.
+        Mengembalikan daftar X lokasi kesalahan, dan daftar j yang sesuai dari
+        posisi kesalahan (log diskrit dari nilai X yang sesuai) Daftar
+        ini bisa besar hingga s elemen.
 
-        Important technical math note: This implementation is not actually
-        Chien's search. Chien's search is a way to evaluate the polynomial
-        such that each evaluation only takes constant time. This here simply
-        does 255 evaluations straight up, which is much less efficient.
+        Catatan teknis matematika penting: Implementasi ini sebenarnya bukan
+        pencarian Chien. Pencarian Chien adalah cara untuk mengevaluasi polinomial
+        sehingga setiap evaluasi hanya memakan waktu konstan. Di sini hanya
+        melakukan 255 evaluasi langsung, yang jauh kurang efisien.
         """
         X = []
         j = []
         p = GF256int(3)
         for l in range(1, 256):
-            # These evaluations could be more efficient, but oh well
+            # Evaluasi ini bisa lebih efisien, tetapi ya sudahlah
             if sigma.evaluate(p ** l) == 0:
                 X.append(p ** (-l))
-                # This is different than the notes, I think the notes were in error
-                # Notes said j values were just l, when it's actually 255 - l
+                # Ini berbeda dari catatan, saya pikir catatan itu salah
+                # Catatan mengatakan nilai j hanya l, padahal sebenarnya 255 - l
                 j.append(255 - l)
 
         return X, j
 
     def _forney(self, omega, X):
-        """Computes the error magnitudes"""
+        """Menghitung besaran kesalahan"""
         s = (self.n - self.k) // 2
 
         Y = []
 
         for l, Xl in enumerate(X):
-            # Compute the first part of Yl
+            # Hitung bagian pertama dari Yl
             Yl = Xl ** s
             Yl *= omega.evaluate(Xl.inverse())
             Yl *= Xl.inverse()
 
-            # Compute the sequence product and multiply its inverse in
+            # Hitung produk urutan dan kalikan kebalikannya
             prod = GF256int(1)
             for ji in range(s):
                 if ji == l:
@@ -353,41 +348,44 @@ class RSCoder(object):
 
 if __name__ == "__main__":
     def test_rs_coder():
-        print("Testing RS Coder...")
+        print("\nREED SOLOMON ALGORITHM\n")
 
-        # Initialize the RS Coder with typical parameters (255, 223)
+        # Inisialisasi RS Coder dengan parameter tipikal (255, 223)
         coder = RSCoder(255, 223)
 
-        # Test message
-        message = b"Hello, Reed-Solomon!"
-        print(f"Original message: {message}")
+        # Pesan uji
+        message = b"Hello, world"
+        print(f"Pesan asli: {message}\n")
 
-        # Encode the message
+        # Kodekan pesan
+        print("====================ENCODE====================")
         encoded_message = coder.encode(message)
-        print(f"Encoded message: {encoded_message}")
+        print(f"Pesan ter-Encode: {encoded_message}")
 
-        # Decode the message
+        # Dekode pesan
+        print("\n====================DECODE====================")
         decoded_message = coder.decode(encoded_message)
-        print(f"Decoded message: {decoded_message}")
+        print(f"Pesan ter-Decode: {decoded_message}")
 
-        # Check if the decoded message matches the original message
-        assert message == decoded_message, "Decoding failed!"
-        print("Decoding successful!")
+        # Periksa apakah pesan terdekod cocok dengan pesan asli
+        assert message == decoded_message, "Dekoding gagal!"
+        print("Dekoding berhasil!")
 
-        # Introduce some errors to the encoded message
+        # Perkenalkan beberapa kesalahan ke pesan terkode
         encoded_message_with_errors = bytearray(encoded_message)
-        encoded_message_with_errors[0] ^= 0xFF  # Invert the first byte
-        encoded_message_with_errors[10] ^= 0xFF  # Invert the 11th byte
+        encoded_message_with_errors[0] ^= 0xFF  # Balikkan byte pertama
+        encoded_message_with_errors[10] ^= 0xFF  # Balikkan byte ke-11
 
-        # Decode the corrupted message
+        # Dekode pesan yang rusak
+        print("\n====================DECODE WITH ERRORS====================")
         try:
             corrected_message = coder.decode(encoded_message_with_errors)
-            print(f"Corrected message: {corrected_message}")
-            assert message == corrected_message, "Error correction failed!"
-            print("Error correction successful!")
+            print(f"Pesan yang dikoreksi: {corrected_message}")
+            assert message == corrected_message, "Koreksi kesalahan gagal!"
+            print("Koreksi kesalahan berhasil!")
         except Exception as e:
-            print(f"Error correction failed: {e}")
+            print(f"Koreksi kesalahan gagal: {e}")
 
     test_rs_coder()
 
-    print("All tests completed.")
+    print("All test Completed!")
