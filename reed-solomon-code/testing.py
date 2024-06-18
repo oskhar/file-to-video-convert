@@ -25,7 +25,6 @@ class TestRSverify(unittest.TestCase):
             bad_code[i] ^= 0xFF  # Invert the byte
             print(f"Modified code at position {i}: {bad_code}")
             self.assertFalse(self.coder.verify(bad_code))
-        print("All modified codewords are invalid\n")
 
 class TestRSdecoding(unittest.TestCase):
     def setUp(self):
